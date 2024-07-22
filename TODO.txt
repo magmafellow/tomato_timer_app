@@ -1,0 +1,2 @@
+* ON pause button pause tomato time as well as relaxing time
+* Make the Tomato component hover-friendly
