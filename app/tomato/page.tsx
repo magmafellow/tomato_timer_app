@@ -1,4 +1,4 @@
-export default function() {
+export default function Tomato() {
   return (
     <div className="flex justify-center items-center h-screen">
       {/* tomato */}
