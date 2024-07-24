@@ -1,2 +1,8 @@
-* ON pause button pause tomato time as well as relaxing time
-* Make the Tomato component hover-friendly
+
+* Make total reset button. Make double check on clicking it.__not_important
+* Put everything in /app/page.tsx code to their components.__important
+* Make reverse timer.__important
+
+
+* ON pause button pause tomato time as well as relaxing time ***DONE***
+* Make the Tomato component hover-friendly__good ***DONE***

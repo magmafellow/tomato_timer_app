@@ -1,38 +1,22 @@
 'use client'
 
-import Tomato from './ui/tomato'
 import { useEffect, useState } from 'react'
-import clsx from 'clsx'
-
-function getSelectValues() {
-  const minutes = Number(document.querySelector('[id="mins"]')?.value)
-  const seconds = Number(document.querySelector('[id="secs"]')?.value)
-
-  return { minutes, seconds }
-}
-
-function getSelectValuesRelax() {
-  const minutes = Number(document.querySelector('[id="mins_relax"]')?.value)
-  const seconds = Number(document.querySelector('[id="secs_relax"]')?.value)
-
-  return { minutes, seconds }
-}
-
-function getTotalSecsFromTimeObj(obj: {
-  seconds: number
-  minutes: number
-}): number {
-  return obj.seconds + obj.minutes * 60
-}
-
-function showTimeFromSeconds(allSeconds: number) {
-  let minutes: string | number = Math.floor(allSeconds / 60)
-  let seconds: string | number = allSeconds % 60
-  if (minutes < 10) minutes = '0' + minutes
-  if (seconds < 10) seconds = '0' + seconds
-
-  return `${minutes}:${seconds}`
-}
+import TomatoesRow from './ui/tomatoes-row'
+import Timer from './ui/timer'
+import RelaxTimer from './ui/relax-timer'
+import ChosenTime from './ui/chosen-time'
+import {
+  getTotalSecsFromTimeObj,
+  getSelectValues,
+  getSelectValuesRelax,
+  fireToast,
+  makeStartSound,
+} from './lib/utils'
+import TomatoTimeSelect from './ui/tomato-time-select'
+import RelaxTimeSelect from './ui/relax-time-select'
+import ManageButtonsContainer from './ui/manage-btns-container'
+import StatusBar from './ui/status-bar'
+import Toast from './ui/toast'
 
 export default function Page() {
   const [secs, setSecs] = useState(0)
@@ -40,9 +24,10 @@ export default function Page() {
   const [chosenTime, setChosenTime] = useState(0)
   const [chosenTimeRelax, setChosenTimeRelax] = useState(0)
   const [tomatoesDone, setTomatoesDone] = useState(0)
-  // status: 'going...', 'pausing...', 'non-active', 'relax waiting', 'relaxing...'
+  // status: 'going...', 'pausing...', 'non-active', 'relax waiting', 'relaxing...', 'pausing relax...'
   const [status, setStatus] = useState('non-active')
 
+  // main use effect. makes timer work. called in root
   useEffect(() => {
     let intervalId = setInterval(() => {
       if (chosenTime !== 0 && secs >= chosenTime) {
@@ -50,6 +35,8 @@ export default function Page() {
         setSecs(0)
         setChosenTime(0)
         setTomatoesDone(tomatoesDone + 1)
+        const audio = new Audio('/end.mp3')
+        audio.play()
 
         return
       }
@@ -63,7 +50,9 @@ export default function Page() {
         setStatus('relaxed')
         setSecsRelax(0)
         setChosenTimeRelax(0)
-
+        const audio = new Audio('/end.mp3')
+        audio.play()
+        
         return
       }
       if (status === 'relaxing...') {
@@ -77,36 +66,30 @@ export default function Page() {
     }
   })
 
-  const tomatoesArrayPlaceholder = Array.from(
-    { length: tomatoesDone },
-    (x, i) => i
-  )
-
   const goHandler = function () {
     if (status === 'relax waiting') {
       if (getTotalSecsFromTimeObj(getSelectValuesRelax()) === 0) return
+      makeStartSound()
+
+      fireToast('toast_start_relax')
       setStatus('relaxing...')
       setChosenTimeRelax(getTotalSecsFromTimeObj(getSelectValuesRelax()))
     } else if (status === 'pausing relax...') {
+      fireToast('toast_continue_relax')
       setStatus('relaxing...')
     } else if (status === 'non-active' || status === 'relaxed') {
       if (getTotalSecsFromTimeObj(getSelectValues()) === 0) return
+      makeStartSound()
+
+      fireToast('toast_start')
       setStatus('going...')
       setChosenTime(getTotalSecsFromTimeObj(getSelectValues()))
     } else if (status === 'pausing...') {
+      fireToast('toast_continue')
       setStatus('going...')
     }
-    // else if (
-    //   status === 'non-active' ||
-    //   status === 'relaxed' ||
-    //   status === 'pausing...'
-    // ) {
-    //   if (getTotalSecsFromTimeObj(getSelectValues()) === 0) return
-    //   setStatus('going...')
-    //   setChosenTime(getTotalSecsFromTimeObj(getSelectValues()))
-    // }
   }
-  const takePause = function () {
+  const takePauseHandler = function () {
     if (status === 'relaxing...') {
       setStatus('pausing relax...')
     } else if (status === 'going...') {
@@ -124,201 +107,53 @@ export default function Page() {
       setChosenTime(0)
     }
   }
-
+  
   return (
     <div className="px-2">
+
+      {/* absolute positioned toast */}
+      <Toast id='toast_start' message='You started tomato!' />
+      <Toast id='toast_start_relax' message='You started relaxing' />
+      <Toast id='toast_continue' message='You continued tomato!' />
+      <Toast id='toast_continue_relax' message='You continued relaxing' />
+  
+      
       <h1 className="font-semibold text-[25px] sm:text-[35px] lg:text-[50px] pt-2 mb-4 sm:mb-6 lg:mb-10 text-red-500 text-center">
         Tomato focus
       </h1>
       <div className="grid">
-        {/* tomatoes */}
-        <div className="flex min-h-[102px] flex-wrap mb-10 gap-10 border-red-200 border-2 pt-5 pb-2 px-4 rounded-md">
-          {tomatoesArrayPlaceholder.map((item, index) => (
-            <Tomato key={index} />
-          ))}
-          {tomatoesDone === 0 && (
-            <span className="text-[24px] sm:text-[32px] md:text-[44px] lg:text-[56px]">
-              Done Tomatoes will appear here...
-            </span>
-          )}
-        </div>
-        {/* timer or relax */}
-        <div
-          className={clsx(
-            'text-[50px] sm:text-[70px] md:text-[80px] lg:text-[100px] mb-4 sm:mb-7 font-semibold text-center',
-            {
-              'text-neutral-600':
-                status === 'relax waiting' ||
-                status === 'relaxing...' ||
-                status === 'pausing relax...',
-              'text-white':
-                status !== 'relax waiting' &&
-                status !== 'relaxing...' &&
-                status !== 'pausing relax...',
-            }
-          )}
-        >
-          {showTimeFromSeconds(secs)}
-        </div>
-        {(status === 'relax waiting' ||
-          status === 'relaxing...' ||
-          status === 'pausing relax...') && (
-          <div className="text-[30px] sm:text-[40px] md:text-[42px] lg:text-[45px] font-semibold text-center">
-            {showTimeFromSeconds(secsRelax)}
-          </div>
-        )}
+        {/* tomatoes row */}
+        <TomatoesRow tomatoesDone={tomatoesDone} />
 
-        {/* <Timer secs={secs} /> */}
+        {/* timer & relax */}
+        <Timer status={status} secs={secs} />
+        <RelaxTimer status={status} secsRelax={secsRelax} />
 
-        {/* chosen time */}
+        {/* chosen (goal) time */}
+        <ChosenTime
+          status={status}
+          chosenTime={chosenTime}
+          chosenTimeRelax={chosenTimeRelax}
+        />
+
+        {/* select time */}
         <div>
-          {(status === 'pausing...' || status === 'going...') && (
-            <p className="text-xl tracking-wider">
-              Tomato time{' '}
-              <span className="text-2xl bg-neutral-700 rounded border border-neutral-200 py-0.5 px-1">
-                {showTimeFromSeconds(chosenTime)}
-              </span>
-            </p>
-          )}
-          {(status === 'relaxing...' || status === 'pausing relax...') && (
-            <p className="text-xl">
-              Relax time{' '}
-              <span className="text-2xl bg-neutral-700 rounded border border-neutral-200 py-0.5 px-1">
-                {showTimeFromSeconds(chosenTimeRelax)}
-              </span>
-            </p>
-          )}
-        </div>
-
-        {/* input */}
-        <div>
-          {/* container for tomato time */}
-          {/* (status !== 'relax waiting' &&
-            status !== 'relaxing...' &&
-            status !== 'pausing relax...') */}
+          {/* container for the tomato time select */}
           {(status === 'non-active' || status === 'relaxed') && (
-            <div>
-              <label className="text-lg mr-1" htmlFor="mins">
-                minutes
-              </label>
-              <select
-                className="bg-black font-semibold text-2xl p-0.5"
-                name="mins"
-                id="mins"
-              >
-                <option value="20">20</option>
-                <option selected value="25">
-                  25
-                </option>
-                <option value="30">30</option>
-              </select>
-              <label className="text-lg mr-1" htmlFor="secs">
-                seconds
-              </label>
-              <select
-                className="bg-black font-semibold text-2xl p-0.5"
-                name="secs"
-                id="secs"
-              >
-                <option value="5">05</option>
-                <option value="20">20</option>
-                <option value="30">30</option>
-                <option value="40">40</option>
-                <option value="50">50</option>
-                <option selected value="00">
-                  00
-                </option>
-              </select>
-            </div>
+            <TomatoTimeSelect />
           )}
 
-          {/* container for relax time */}
-          {/* (status === 'relax waiting' ||
-            status === 'relaxing...' ||
-            status === 'pausing relax...') */}
+          {/* container for the relax time select */}
           {status === 'relax waiting' && (
-            <div>
-              <label className="text-lg mr-1" htmlFor="mins">
-                minutes
-              </label>
-              <select
-                className="bg-black font-semibold text-2xl p-0.5"
-                name="mins_relax"
-                id="mins_relax"
-              >
-                {tomatoesDone !== 0 && tomatoesDone % 4 === 0 ? (
-                  <>
-                    <option value="20">20</option>
-                    <option selected value="15">
-                      15
-                    </option>
-                    <option value="12">12</option>
-                    <option value="10">10</option>
-                  </>
-                ) : (
-                  <>
-                    <option selected value="5">
-                      05
-                    </option>
-                    <option value="6">06</option>
-                    <option value="7">07</option>
-                  </>
-                )}
-              </select>
-              <label className="text-lg mr-1" htmlFor="secs">
-                seconds
-              </label>
-              <select
-                className="bg-black font-semibold text-2xl p-0.5"
-                name="secs_relax"
-                id="secs_relax"
-              >
-                <option value="5">05</option>
-                <option value="20">20</option>
-                <option value="30">30</option>
-                <option value="40">40</option>
-                <option value="50">50</option>
-                <option selected value="00">
-                  00
-                </option>
-              </select>
-            </div>
+            <RelaxTimeSelect tomatoesDone={tomatoesDone} />
           )}
+        </div>
 
-          <div className="flex gap-10 justify-center py-10">
-            <button
-              className="py-2 px-4 rounded bg-gray-500 font-semibold"
-              onClick={takePause}
-            >
-              Pause
-            </button>
-            <button
-              className="py-2 px-4 rounded bg-amber-500 font-semibold"
-              onClick={goHandler}
-            >
-              {status === 'relax waiting' || status === 'pausing relax...'
-                ? 'relax'
-                : 'GO!'}
-            </button>
-            <button
-              className="py-2 px-4 rounded bg-red-800 font-semibold"
-              onClick={resetHandler}
-            >
-              Reset
-            </button>
-          </div>
-        </div>
+        {/* management buttons */}
+        <ManageButtonsContainer status={status} goHandler={goHandler} resetHandler={resetHandler} takePauseHandler={takePauseHandler} />
+        
         {/* statusbar */}
-        <div className="text-lg">
-          <div className="text-sky-300">
-            <span>status: </span> <span className="font-bold">{status}</span>
-          </div>
-          <div className="text-emerald-300">
-            {' '}
-            <span>All done: </span>{' '}
-            <span className="font-bold">{tomatoesDone}</span>{' '}
-          </div>
-        </div>
+        <StatusBar status={status} tomatoesDone={tomatoesDone} />
       </div>
     </div>
   )
